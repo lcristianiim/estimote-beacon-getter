@@ -2,9 +2,6 @@ var Bleacon = require('./index');
 var request = require('request');
 var _ = require('underscore');
 
-
-var beacons = '11111111111111111111111111111111';
-
 var noble = require('noble');
 var estimote = require('./estimote/estimote.js');
 var NobleDevice = require('noble-device');
@@ -45,6 +42,7 @@ noble.on('discover', function(peripheral) {
     var telemetryPacket = parseEstimoteTelemetryPacket(data);
 
     if (telemetryPacket) {
+        // console.log(JSON.stringify(telemetryPacket));
         let discoveredVehicle = new Vehicle(telemetryPacket.shortIdentifier);
 
         let isExistent = checkIfVehicleExists(discoveredVehicle, vehicles);
@@ -52,7 +50,7 @@ noble.on('discover', function(peripheral) {
         if (isExistent >= 0) {
 
 
-            vehicles[isExistent].measurementsData.push(calculateDistance2(-56, peripheral.rssi));
+            vehicles[isExistent].measurementsData.push(calculateDistance4(-56, peripheral.rssi));
 
             updateTelemetry(telemetryPacket, vehicles[isExistent]);
 
@@ -62,7 +60,7 @@ noble.on('discover', function(peripheral) {
 
             sortMeasurementsData(vehicles[isExistent]);
 
-            vehicles[isExistent].distance = calculateDistance(vehicles[isExistent]);
+            vehicles[isExistent].distance = transformDistance(calculateDistance(vehicles[isExistent]));
 
             cutExcesiveMeasurements(vehicles[isExistent]);
 
@@ -74,6 +72,25 @@ noble.on('discover', function(peripheral) {
 
     }
 });
+
+function transformDistance(dist){
+	if(dist <= 2.8)
+  	        return "0";
+	else if(dist > 2.8 && dist <= 3.15)
+		return "50";
+	else if(dist > 3.15 && dist <= 3.25)
+		return "100";
+	else if(dist > 3.25 && dist <= 3.5)
+		return "150";
+	else if(dist > 3.5 && dist <= 3.6)
+		return "200";
+	else if(dist > 3.6 && dist <= 3.85)
+		return "250";
+	else if(dist > 3.7 && dist <= 3.88)
+		return "300";
+	else if(dist > 3.88)
+		return "400";
+}
 
 function cutExcesiveMeasurements(vehicle) {
     let maximumValuesPermited = 50;
@@ -137,17 +154,16 @@ function updateVehicleWithBTelemetry(telemetryPacket, vehicle) {
 
 var postingData = function(interval, path, data) {
     setInterval(function() {
+
+        // displayDistance(data, 'f572395096619970');
+
         request.post(path,
             {json: true, body: data},
             function(err, res, body) {
-                if (body) {
-                    //console.log("Posting the vehicles was ok.");
-                } else {
-                    //console.log("Posting the vehicles failed.");
-                }
-                   console.log(JSON.stringify(vehicles));
+                displayPostStatus(body);
             }
         );
+
     }, interval);
 };
 
@@ -156,6 +172,25 @@ postingData(1000, 'http://localhost:8090/vehiclesposition', vehicles);
 
 // HELPER FUNCTIONS
 // ================
+
+function displayDistance(data, beacon) {
+    for (var i = 0; i < data.length; i++) {
+        if (data[i].shortIdentifier == beacon) {
+            console.log('Beacon beetroot');
+            console.log(data[i].distance);
+            console.log('================');
+
+        }
+    }
+}
+
+function displayPostStatus(body) {
+    if (body) {
+        console.log("Posting the vehicles was ok.");
+    } else {
+        console.log("Posting the vehicles failed.");
+    }
+}
 
 var displayRaw = function(){
     Bleacon.on('discover', function(bleacon) {
